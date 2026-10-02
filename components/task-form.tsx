@@ -1,4 +1,80 @@
-'use client'
-import { useState } from 'react'
-import { createTask } from '@/app/(app)/actions'
-export function TaskForm({projects}:{projects:{id:string;name:string}[]}){const [open,setOpen]=useState(false);const [message,setMessage]=useState('');if(!projects.length)return null;return <><button onClick={()=>setOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3.5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-zinc-950">+ New task</button>{open&&<div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4"><form action={async f=>{const r=await createTask({title:f.get('title'),project_id:f.get('project_id'),priority:f.get('priority')});setMessage(r.message);if(r.ok)setTimeout(()=>setOpen(false),500)}} className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900"><h2 className="font-semibold">Create task</h2><div className="mt-5 grid gap-4"><input name="title" required className="rounded-lg border px-3 py-2 dark:bg-zinc-950" placeholder="What needs to be done?"/><select name="project_id" className="rounded-lg border px-3 py-2 dark:bg-zinc-950">{projects.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select><select name="priority" className="rounded-lg border px-3 py-2 dark:bg-zinc-950"><option>MEDIUM</option><option>LOW</option><option>HIGH</option><option>URGENT</option></select></div>{message&&<p className="mt-3 text-sm">{message}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setOpen(false)} className="px-3 py-2 text-sm">Cancel</button><button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">Create task</button></div></form></div>}</>}
+"use client";
+import { useState } from "react";
+import { createTask } from "@/app/(app)/actions";
+export function TaskForm({
+  projects,
+}: {
+  projects: { id: string; name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  if (!projects.length) return null;
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3.5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+      >
+        + New task
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4">
+          <form
+            action={async (f) => {
+              const r = await createTask({
+                title: f.get("title"),
+                project_id: f.get("project_id"),
+                priority: f.get("priority"),
+              });
+              setMessage(r.message);
+              if (r.ok) setTimeout(() => setOpen(false), 500);
+            }}
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900"
+          >
+            <h2 className="font-semibold">Create task</h2>
+            <div className="mt-5 grid gap-4">
+              <input
+                name="title"
+                required
+                className="rounded-lg border px-3 py-2 dark:bg-zinc-950"
+                placeholder="What needs to be done?"
+              />
+              <select
+                name="project_id"
+                className="rounded-lg border px-3 py-2 dark:bg-zinc-950"
+              >
+                {projects.map((p) => (
+                  <option value={p.id} key={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="priority"
+                className="rounded-lg border px-3 py-2 dark:bg-zinc-950"
+              >
+                <option>MEDIUM</option>
+                <option>LOW</option>
+                <option>HIGH</option>
+                <option>URGENT</option>
+              </select>
+            </div>
+            {message && <p className="mt-3 text-sm">{message}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">
+                Create task
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}

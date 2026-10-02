@@ -1,12 +1,121 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Plus, X, LoaderCircle, CheckCircle2 } from 'lucide-react'
-import { createCustomer } from '@/app/(app)/actions'
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Plus, X, LoaderCircle, CheckCircle2 } from "lucide-react";
+import { createCustomer } from "@/app/(app)/actions";
 
-const schema = z.object({ name: z.string().min(1, 'Name is required'), email: z.string().email('Enter a valid email').or(z.literal('')), company: z.string(), phone: z.string() })
-type Values = z.infer<typeof schema>
-export function CustomerForm() { const [open,setOpen]=useState(false);const [message,setMessage]=useState('');const {register,handleSubmit,formState:{errors,isSubmitting},reset}=useForm<Values>({resolver:zodResolver(schema),defaultValues:{name:'',email:'',company:'',phone:''}}); const submit=async(values:Values)=>{setMessage('');const result=await createCustomer(values);setMessage(result.message);if(result.ok){reset();setTimeout(()=>setOpen(false),700)}};return <><button onClick={()=>setOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3.5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"><Plus size={16}/>Add customer</button>{open&&<div className="fixed inset-0 z-[60] grid place-items-center bg-zinc-950/40 p-4"><form onSubmit={handleSubmit(submit)} className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900"><div className="flex items-start justify-between"><div><h2 className="font-semibold">Add customer</h2><p className="mt-1 text-sm text-zinc-500">Create a new record in your workspace.</p></div><button type="button" onClick={()=>setOpen(false)}><X size={18}/></button></div><div className="mt-5 grid gap-4">{[['name','Customer name'],['email','Email address'],['company','Company'],['phone','Phone']].map(([key,label])=><label key={key} className="grid gap-1.5 text-sm font-medium">{label}<input {...register(key as keyof Values)} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-zinc-700 dark:bg-zinc-950"/>{key==='name'&&errors.name&&<span className="text-xs text-red-600">{errors.name.message}</span>}{key==='email'&&errors.email&&<span className="text-xs text-red-600">{errors.email.message}</span>}</label>)}</div>{message&&<p className={`mt-4 flex items-center gap-2 text-sm ${message.includes('success')?'text-emerald-600':'text-red-600'}`}><CheckCircle2 size={15}/>{message}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setOpen(false)} className="rounded-lg px-3 py-2 text-sm">Cancel</button><button disabled={isSubmitting} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60">{isSubmitting&&<LoaderCircle className="animate-spin" size={15}/>}{isSubmitting?'Saving...':'Create customer'}</button></div></form></div>}</> }
+const schema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Enter a valid email").or(z.literal("")),
+  company: z.string(),
+  phone: z.string(),
+});
+type Values = z.infer<typeof schema>;
+export function CustomerForm() {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: "", email: "", company: "", phone: "" },
+  });
+  const submit = async (values: Values) => {
+    setMessage("");
+    const result = await createCustomer(values);
+    setMessage(result.message);
+    if (result.ok) {
+      reset();
+      setTimeout(() => setOpen(false), 700);
+    }
+  };
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3.5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+      >
+        <Plus size={16} />
+        Add customer
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-zinc-950/40 p-4">
+          <form
+            onSubmit={handleSubmit(submit)}
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="font-semibold">Add customer</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Create a new record in your workspace.
+                </p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-5 grid gap-4">
+              {[
+                ["name", "Customer name"],
+                ["email", "Email address"],
+                ["company", "Company"],
+                ["phone", "Phone"],
+              ].map(([key, label]) => (
+                <label key={key} className="grid gap-1.5 text-sm font-medium">
+                  {label}
+                  <input
+                    {...register(key as keyof Values)}
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-zinc-700 dark:bg-zinc-950"
+                  />
+                  {key === "name" && errors.name && (
+                    <span className="text-xs text-red-600">
+                      {errors.name.message}
+                    </span>
+                  )}
+                  {key === "email" && errors.email && (
+                    <span className="text-xs text-red-600">
+                      {errors.email.message}
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {message && (
+              <p
+                className={`mt-4 flex items-center gap-2 text-sm ${message.includes("success") ? "text-emerald-600" : "text-red-600"}`}
+              >
+                <CheckCircle2 size={15} />
+                {message}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {isSubmitting && (
+                  <LoaderCircle className="animate-spin" size={15} />
+                )}
+                {isSubmitting ? "Saving..." : "Create customer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}

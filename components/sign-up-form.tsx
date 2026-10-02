@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { cn } from '@/lib/utils'
+import { safeNextPath } from '@/lib/safe-next-path'
 import { createClient } from '@/lib/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,11 +39,15 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
     }
 
     try {
+      const next = safeNextPath(
+        new URLSearchParams(window.location.search).get('next'),
+        '/onboarding',
+      )
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`,
         },
       })
       if (error) throw error
@@ -69,6 +74,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="m@example.com"
                   required
                   value={email}
@@ -82,6 +88,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -94,6 +101,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                 <Input
                   id="repeat-password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}

@@ -1,3 +1,4 @@
 import { WorkspacePage } from '@/components/workspace-page'
-import { createClient } from '@/lib/server'
-export default async function Page() { const supabase=await createClient(); const [{data:tasks},{data:projects}]=await Promise.all([supabase.from('tasks').select('id,title,status,priority,due_date,project_id').order('created_at',{ascending:false}),supabase.from('projects').select('id,name').order('name')]); return <WorkspacePage kind="tasks" data={{tasks:tasks ?? [],projects:projects ?? []}}/> }
+import { createClient, throwIfSupabaseError } from '@/lib/server'
+import { requireActiveWorkspace } from '@/lib/workspace'
+export default async function Page() { const supabase=await createClient(); const workspace=await requireActiveWorkspace(supabase); const [{data:tasks,error:tasksError},{data:projects,error:projectsError}]=await Promise.all([supabase.from('tasks').select('id,title,status,priority,due_date,project_id').eq('organization_id',workspace.organization_id).order('created_at',{ascending:false}),supabase.from('projects').select('id,name').eq('organization_id',workspace.organization_id).order('name')]); throwIfSupabaseError('Unable to load tasks', tasksError); throwIfSupabaseError('Unable to load task projects', projectsError); return <WorkspacePage kind="tasks" data={{tasks:tasks ?? [],projects:projects ?? []}}/> }

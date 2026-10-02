@@ -1,6 +1,150 @@
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ArrowLeft, Building2, Mail, Phone } from 'lucide-react'
-import { createClient } from '@/lib/server'
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Building2, Mail, Phone } from "lucide-react";
+import { createClient, throwIfSupabaseError } from "@/lib/server";
+import { CustomerEditor } from "@/components/record-editors";
+import { requireActiveWorkspace } from "@/lib/workspace";
 
-export default async function CustomerDetail({params}:{params:Promise<{id:string}>}) { const {id}=await params; const supabase=await createClient(); const [{data:customer},{data:projects},{data:invoices},{data:activity}]=await Promise.all([supabase.from('customers').select('*').eq('id',id).maybeSingle(),supabase.from('projects').select('id,name,status,deadline').eq('customer_id',id),supabase.from('invoices').select('id,invoice_number,status,total,due_date').eq('customer_id',id),supabase.from('activity_logs').select('id,action,created_at').eq('entity_id',id).order('created_at',{ascending:false}).limit(10)]); if(!customer)notFound(); return <div><Link href="/customers" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-950"><ArrowLeft size={15}/>Customers</Link><div className="mt-5"><span className="grid size-12 place-items-center rounded-xl bg-indigo-100 font-semibold text-indigo-700">{customer.name.slice(0,2).toUpperCase()}</span><h1 className="mt-4 text-2xl font-semibold">{customer.name}</h1><p className="mt-1 text-sm text-zinc-500">{customer.company ?? 'Customer record'}</p></div><div className="mt-8 grid gap-5 lg:grid-cols-3"><section className="rounded-xl border bg-white p-5 lg:col-span-2 dark:border-zinc-800 dark:bg-zinc-900"><h2 className="font-medium">Projects</h2>{projects?.length?<div className="mt-4 divide-y">{projects.map(p=><Link href={`/projects/${p.id}`} className="flex justify-between py-4 text-sm" key={p.id}><span className="font-medium">{p.name}</span><span className="text-zinc-500">{p.status}</span></Link>)}</div>:<p className="mt-4 text-sm text-zinc-500">No projects linked to this customer.</p>}<h2 className="mt-8 font-medium">Invoices</h2>{invoices?.length?<div className="mt-4 divide-y">{invoices.map(i=><Link href={`/invoices/${i.id}`} className="flex justify-between py-3 text-sm" key={i.id}><span>{i.invoice_number}</span><span className="font-medium">${Number(i.total).toFixed(2)}</span></Link>)}</div>:<p className="mt-4 text-sm text-zinc-500">No invoices yet.</p>}</section><aside className="rounded-xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><h2 className="font-medium">Contact</h2><div className="mt-4 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">{customer.email&&<p className="flex gap-2"><Mail size={15}/>{customer.email}</p>}{customer.phone&&<p className="flex gap-2"><Phone size={15}/>{customer.phone}</p>}{customer.company&&<p className="flex gap-2"><Building2 size={15}/>{customer.company}</p>}</div></aside></div><section className="mt-5 rounded-xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><h2 className="font-medium">Activity history</h2>{activity?.length?<div className="mt-4 space-y-3">{activity.map(a=><p key={a.id} className="text-sm text-zinc-500">{a.action} · {new Date(a.created_at).toLocaleDateString()}</p>)}</div>:<p className="mt-4 text-sm text-zinc-500">No activity recorded yet.</p>}</section></div> }
+export default async function CustomerDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const workspace = await requireActiveWorkspace(supabase);
+  const [
+    { data: customer, error: customerError },
+    { data: projects, error: projectsError },
+    { data: invoices, error: invoicesError },
+    { data: activity, error: activityError },
+  ] = await Promise.all([
+    supabase.from("customers").select("*").eq("organization_id", workspace.organization_id).eq("id", id).maybeSingle(),
+    supabase
+      .from("projects")
+      .select("id,name,status,deadline")
+      .eq("organization_id", workspace.organization_id)
+      .eq("customer_id", id),
+    supabase
+      .from("invoices")
+      .select("id,invoice_number,status,total,due_date")
+      .eq("organization_id", workspace.organization_id)
+      .eq("customer_id", id),
+    supabase
+      .from("activity_logs")
+      .select("id,action,created_at")
+      .eq("organization_id", workspace.organization_id)
+      .eq("entity_id", id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+  throwIfSupabaseError("Unable to load customer", customerError);
+  throwIfSupabaseError("Unable to load customer projects", projectsError);
+  throwIfSupabaseError("Unable to load customer invoices", invoicesError);
+  throwIfSupabaseError("Unable to load customer activity", activityError);
+  if (!customer) notFound();
+  return (
+    <div>
+      <Link
+        href="/customers"
+        className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-950"
+      >
+        <ArrowLeft size={15} />
+        Customers
+      </Link>
+      <div className="mt-5 flex items-start justify-between gap-4">
+        <div>
+          <span className="grid size-12 place-items-center rounded-xl bg-indigo-100 font-semibold text-indigo-700">
+            {customer.name.slice(0, 2).toUpperCase()}
+          </span>
+          <h1 className="mt-4 text-2xl font-semibold">{customer.name}</h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            {customer.company ?? "Customer record"}
+          </p>
+        </div>
+        <CustomerEditor customer={customer} />
+      </div>
+      <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <section className="rounded-xl border bg-white p-5 lg:col-span-2 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="font-medium">Projects</h2>
+          {projects?.length ? (
+            <div className="mt-4 divide-y">
+              {projects.map((p) => (
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="flex justify-between py-4 text-sm"
+                  key={p.id}
+                >
+                  <span className="font-medium">{p.name}</span>
+                  <span className="text-zinc-500">{p.status}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">
+              No projects linked to this customer.
+            </p>
+          )}
+          <h2 className="mt-8 font-medium">Invoices</h2>
+          {invoices?.length ? (
+            <div className="mt-4 divide-y">
+              {invoices.map((i) => (
+                <Link
+                  href={`/invoices/${i.id}`}
+                  className="flex justify-between py-3 text-sm"
+                  key={i.id}
+                >
+                  <span>{i.invoice_number}</span>
+                  <span className="font-medium">
+                    ${Number(i.total).toFixed(2)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">No invoices yet.</p>
+          )}
+        </section>
+        <aside className="rounded-xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="font-medium">Contact</h2>
+          <div className="mt-4 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+            {customer.email && (
+              <p className="flex gap-2">
+                <Mail size={15} />
+                {customer.email}
+              </p>
+            )}
+            {customer.phone && (
+              <p className="flex gap-2">
+                <Phone size={15} />
+                {customer.phone}
+              </p>
+            )}
+            {customer.company && (
+              <p className="flex gap-2">
+                <Building2 size={15} />
+                {customer.company}
+              </p>
+            )}
+          </div>
+        </aside>
+      </div>
+      <section className="mt-5 rounded-xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="font-medium">Activity history</h2>
+        {activity?.length ? (
+          <div className="mt-4 space-y-3">
+            {activity.map((a) => (
+              <p key={a.id} className="text-sm text-zinc-500">
+                {a.action} · {new Date(a.created_at).toLocaleDateString()}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-zinc-500">
+            No activity recorded yet.
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}

@@ -374,21 +374,6 @@ create policy storage_project_files_insert on storage.objects for insert to auth
 create policy storage_project_files_update on storage.objects for update to authenticated using (bucket_id = 'flowdesk-project-files' and (owner_id = auth.uid()::text or public.storage_path_org_admin(name))) with check (bucket_id = 'flowdesk-project-files' and public.storage_project_access(name, true));
 create policy storage_project_files_delete on storage.objects for delete to authenticated using (bucket_id = 'flowdesk-project-files' and (owner_id = auth.uid()::text or public.storage_path_org_admin(name)));
 
--- Optional test fixtures: first create these Auth users in the Supabase dashboard (or replace emails), then rerun this block in a development database.
-do $$
-declare owner_id uuid := (select id from auth.users where email = 'owner@flowdesk.test'); member_id uuid := (select id from auth.users where email = 'member@flowdesk.test'); org_id uuid := '11111111-1111-1111-1111-111111111111'; customer_id uuid := '22222222-2222-2222-2222-222222222222'; project_id uuid := '33333333-3333-3333-3333-333333333333';
-begin
-  if owner_id is null then raise notice 'FlowDesk fixtures skipped: create owner@flowdesk.test in Auth first'; return; end if;
-  insert into public.organizations(id,name,slug) values (org_id,'ABC Digital Agency','abc-digital-agency') on conflict (id) do nothing;
-  insert into public.organization_members(organization_id,user_id,role) values (org_id,owner_id,'OWNER') on conflict do nothing;
-  if member_id is not null then insert into public.organization_members(organization_id,user_id,role) values (org_id,member_id,'MEMBER') on conflict do nothing; end if;
-  insert into public.customers(id,organization_id,name,email,company,status) values (customer_id,org_id,'Olivia Martin','olivia@acme.test','Acme Co.','ACTIVE') on conflict do nothing;
-  insert into public.projects(id,organization_id,customer_id,name,description,status,created_by,start_date,deadline) values (project_id,org_id,customer_id,'Acme Website Redesign','A modern marketing site and CMS migration.','ACTIVE',owner_id,current_date,current_date + 30) on conflict do nothing;
-  insert into public.project_members(project_id,user_id) values (project_id,owner_id) on conflict do nothing;
-  if member_id is not null then insert into public.project_members(project_id,user_id) values (project_id,member_id) on conflict do nothing; end if;
-  insert into public.tasks(organization_id,project_id,title,description,status,priority,assigned_to,created_by,due_date) values (org_id,project_id,'Create homepage wireframes','Prepare initial desktop and mobile concepts.','TODO','HIGH',coalesce(member_id,owner_id),owner_id,current_date + 7) on conflict do nothing;
-end $$;
-
 comment on table public.organization_members is 'Tenant boundary. All organization-scoped access is derived from this table.';
 comment on table public.activity_logs is 'Append-only audit trail; only the log_activity RPC writes client-originated events.';
 comment on column public.project_files.file_path is 'Private Storage object key, not a public URL.';

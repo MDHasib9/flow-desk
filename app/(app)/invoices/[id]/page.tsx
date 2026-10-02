@@ -1,7 +1,113 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { createClient } from '@/lib/server'
+import { createClient, throwIfSupabaseError } from '@/lib/server'
 import { InvoiceControls } from '@/components/invoice-item-form'
+import { requireActiveWorkspace } from '@/lib/workspace'
 
-export default async function InvoiceDetail({params}:{params:Promise<{id:string}>}){const {id}=await params;const supabase=await createClient();const [{data:invoice},{data:items}]=await Promise.all([supabase.from('invoices').select('id,invoice_number,status,subtotal,tax,total,issue_date,due_date,notes,customers(name,email)').eq('id',id).maybeSingle(),supabase.from('invoice_items').select('id,description,quantity,unit_price,total').eq('invoice_id',id)]);if(!invoice)notFound();const customer=Array.isArray(invoice.customers)?invoice.customers[0]:invoice.customers;return <div><Link href="/invoices" className="inline-flex items-center gap-2 text-sm text-zinc-500"><ArrowLeft size={15}/>Invoices</Link><article className="mx-auto mt-6 max-w-3xl rounded-xl border bg-white p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"><div className="flex justify-between"><div><p className="text-sm text-zinc-500">Invoice</p><h1 className="text-2xl font-semibold">{invoice.invoice_number}</h1></div><span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{invoice.status}</span></div><div className="mt-12 grid grid-cols-2 text-sm"><div><p className="text-zinc-500">Billed to</p><p className="mt-2 font-medium">{customer?.name}</p><p className="text-zinc-500">{customer?.email}</p></div><div className="text-right"><p className="text-zinc-500">Due date</p><p className="mt-2 font-medium">{invoice.due_date ?? 'No due date'}</p></div></div><div className="mt-10 border-y py-4 text-sm">{items?.length?items.map(item=><div className="flex justify-between py-2" key={item.id}><span>{item.description} × {item.quantity}</span><span>${Number(item.total).toFixed(2)}</span></div>):<div className="flex justify-between"><span>Invoice total</span><span>${Number(invoice.subtotal).toFixed(2)}</span></div>}</div><div className="ml-auto mt-6 w-56 space-y-2 text-sm"><div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>${Number(invoice.subtotal).toFixed(2)}</span></div><div className="flex justify-between text-zinc-500"><span>Tax</span><span>${Number(invoice.tax).toFixed(2)}</span></div><div className="flex justify-between text-lg font-semibold"><span>Total</span><span>${Number(invoice.total).toFixed(2)}</span></div></div><InvoiceControls invoiceId={invoice.id} status={invoice.status}/>{invoice.notes&&<p className="mt-8 border-t pt-5 text-sm text-zinc-500">{invoice.notes}</p>}</article></div>}
+export default async function InvoiceDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const workspace = await requireActiveWorkspace(supabase);
+  const [
+    { data: invoice, error: invoiceError },
+    { data: items, error: itemsError },
+  ] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select(
+        "id,invoice_number,status,subtotal,tax,total,issue_date,due_date,notes,customers(name,email)",
+      )
+      .eq("organization_id", workspace.organization_id)
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("invoice_items")
+      .select("id,description,quantity,unit_price,total")
+      .eq("invoice_id", id),
+  ]);
+  throwIfSupabaseError("Unable to load invoice", invoiceError);
+  throwIfSupabaseError("Unable to load invoice items", itemsError);
+  if (!invoice) notFound();
+
+  const customer = Array.isArray(invoice.customers)
+    ? invoice.customers[0]
+    : invoice.customers;
+
+  return (
+    <div>
+      <Link
+        href="/invoices"
+        className="inline-flex items-center gap-2 text-sm text-zinc-500"
+      >
+        <ArrowLeft size={15} />
+        Invoices
+      </Link>
+      <article className="mx-auto mt-6 max-w-3xl rounded-xl border bg-white p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Invoice</p>
+            <h1 className="text-2xl font-semibold">{invoice.invoice_number}</h1>
+          </div>
+          <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+            {invoice.status}
+          </span>
+        </div>
+        <div className="mt-12 grid grid-cols-2 text-sm">
+          <div>
+            <p className="text-zinc-500">Billed to</p>
+            <p className="mt-2 font-medium">{customer?.name}</p>
+            <p className="text-zinc-500">{customer?.email}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-zinc-500">Due date</p>
+            <p className="mt-2 font-medium">
+              {invoice.due_date ?? "No due date"}
+            </p>
+          </div>
+        </div>
+        <div className="mt-10 border-y py-4 text-sm">
+          {items?.length ? (
+            items.map((item) => (
+              <div className="flex justify-between py-2" key={item.id}>
+                <span>
+                  {item.description} × {item.quantity}
+                </span>
+                <span>${Number(item.total).toFixed(2)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between">
+              <span>Invoice total</span>
+              <span>${Number(invoice.subtotal).toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+        <div className="ml-auto mt-6 w-56 space-y-2 text-sm">
+          <div className="flex justify-between text-zinc-500">
+            <span>Subtotal</span>
+            <span>${Number(invoice.subtotal).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-zinc-500">
+            <span>Tax</span>
+            <span>${Number(invoice.tax).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-lg font-semibold">
+            <span>Total</span>
+            <span>${Number(invoice.total).toFixed(2)}</span>
+          </div>
+        </div>
+        <InvoiceControls invoiceId={invoice.id} status={invoice.status} />
+        {invoice.notes && (
+          <p className="mt-8 border-t pt-5 text-sm text-zinc-500">
+            {invoice.notes}
+          </p>
+        )}
+      </article>
+    </div>
+  );
+}

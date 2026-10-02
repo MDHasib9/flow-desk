@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getSupabasePublicConfig } from '@/lib/supabase-config'
 
 /**
  * If using Fluid compute: Don't put this client in a global variable. Always create a new client within each
@@ -7,10 +8,11 @@ import { cookies } from 'next/headers'
  */
 export async function createClient() {
   const cookieStore = await cookies()
+  const { url, publishableKey } = getSupabasePublicConfig()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    url,
+    publishableKey,
     {
       cookies: {
         getAll() {
@@ -30,4 +32,13 @@ export async function createClient() {
       },
     }
   )
+}
+
+export function throwIfSupabaseError(
+  operation: string,
+  error: { message: string; name?: string } | null,
+) {
+  if (error && error.name !== 'AuthSessionMissingError') {
+    throw new Error(`${operation}: ${error.message}`)
+  }
 }

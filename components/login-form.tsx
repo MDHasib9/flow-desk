@@ -18,12 +18,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 
-export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+type LoginFormProps = React.ComponentPropsWithoutRef<'div'> & {
+  nextPath?: string
+}
+
+export function LoginForm({ className, nextPath, ...props }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const signUpHref = nextPath
+    ? `/auth/sign-up?next=${encodeURIComponent(nextPath)}`
+    : '/auth/sign-up'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,6 +69,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="m@example.com"
                   required
                   value={email}
@@ -81,6 +89,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -93,7 +102,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{' '}
-              <Link href="/auth/sign-up" className="underline underline-offset-4">
+              <Link href={signUpHref} className="underline underline-offset-4">
                 Sign up
               </Link>
             </div>
