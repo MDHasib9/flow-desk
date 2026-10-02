@@ -1,0 +1,5 @@
+'use client'
+import { useState } from 'react'
+import { createClient } from '@/lib/client'
+import { saveProjectFile } from '@/app/(app)/actions'
+export function ProjectFileUpload({organizationId,projectId}:{organizationId:string;projectId:string}){const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);return <div className="mt-3"><label className="inline-flex cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium"><input type="file" className="hidden" onChange={async e=>{const file=e.target.files?.[0];if(!file)return;setBusy(true);const key=`${organizationId}/${projectId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const supabase=createClient();const {error}=await supabase.storage.from('flowdesk-project-files').upload(key,file,{contentType:file.type});if(error){setMessage(error.message);setBusy(false);return}const result=await saveProjectFile({project_id:projectId,file_name:file.name,file_path:key,file_type:file.type||null,file_size:file.size});setMessage(result.message);setBusy(false)}}/> {busy?'Uploading…':'Upload file'}</label>{message&&<p className="mt-2 text-xs text-zinc-500">{message}</p>}</div>}
