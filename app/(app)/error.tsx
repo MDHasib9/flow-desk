@@ -1,0 +1,2 @@
+'use client'
+export default function Error({reset}:{error:Error;reset:()=>void}) { return <div className="grid min-h-96 place-items-center text-center"><div><p className="text-lg font-semibold">Something needs your attention.</p><p className="mt-2 text-sm text-zinc-500">We couldn’t load this workspace view. Your data is safe.</p><button onClick={reset} className="mt-5 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-zinc-950">Try again</button></div></div> }
