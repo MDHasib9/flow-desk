@@ -10,6 +10,8 @@ const organizationSchema = z.object({ name: z.string().trim().min(2).max(160), s
 const projectSchema = z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).optional(), customer_id: z.string().uuid().optional().or(z.literal('')), deadline: z.string().date().optional().or(z.literal('')) })
 const taskSchema = z.object({ title: z.string().trim().min(1).max(280), project_id: z.string().uuid(), priority: z.enum(['LOW','MEDIUM','HIGH','URGENT']).default('MEDIUM') })
 const invoiceSchema = z.object({ customer_id: z.string().uuid(), subtotal: z.coerce.number().nonnegative(), tax: z.coerce.number().nonnegative().default(0), due_date: z.string().date().optional().or(z.literal('')), notes: z.string().max(2000).optional() })
+const profileSchema = z.object({ full_name: z.string().trim().min(1).max(160) })
+const orgSchema = z.object({ name: z.string().trim().min(2).max(160) })
 
 async function currentMembership() {
   const supabase = await createClient()
@@ -48,8 +50,10 @@ export async function createProject(input: unknown) {
   if (!parsed.success) return { ok: false, message: 'Please enter a valid project.' }
   const { supabase, user, membership } = await currentMembership()
   if (!user || !membership) return { ok: false, message: 'You must belong to an organization.' }
-  const { error } = await supabase.from('projects').insert({ organization_id: membership.organization_id, name: parsed.data.name, description: parsed.data.description || null, customer_id: parsed.data.customer_id || null, deadline: parsed.data.deadline || null, created_by: user.id, status: 'PLANNING' })
+  const { data: project, error } = await supabase.from('projects').insert({ organization_id: membership.organization_id, name: parsed.data.name, description: parsed.data.description || null, customer_id: parsed.data.customer_id || null, deadline: parsed.data.deadline || null, created_by: user.id, status: 'PLANNING' }).select('id').single()
   if (error) return { ok: false, message: error.message }
+  const { error: memberError } = await supabase.from('project_members').insert({ project_id: project.id, user_id: user.id })
+  if (memberError) return { ok: false, message: memberError.message }
   revalidatePath('/projects'); revalidatePath('/dashboard')
   return { ok: true, message: 'Project created successfully.' }
 }
@@ -87,3 +91,36 @@ export async function createInvoice(input: unknown) {
   revalidatePath('/invoices'); revalidatePath('/dashboard')
   return { ok: true, message: 'Invoice created successfully.' }
 }
+
+export async function markNotificationRead(id: string) {
+  const parsed=z.string().uuid().safeParse(id); if(!parsed.success)return {ok:false,message:'Invalid notification.'}
+  const {supabase,user}=await currentMembership(); if(!user)return {ok:false,message:'You must be signed in.'}
+  const {error}=await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('id',parsed.data)
+  if(error)return {ok:false,message:error.message}; revalidatePath('/notifications'); return {ok:true,message:'Marked as read.'}
+}
+export async function updateProfile(input: unknown) {
+  const parsed=profileSchema.safeParse(input); if(!parsed.success)return {ok:false,message:'Enter your name.'}
+  const {supabase,user}=await currentMembership();if(!user)return {ok:false,message:'You must be signed in.'}
+  const {error}=await supabase.from('profiles').update({full_name:parsed.data.full_name}).eq('id',user.id)
+  if(error)return {ok:false,message:error.message}; revalidatePath('/', 'layout');return {ok:true,message:'Profile saved.'}
+}
+export async function updateOrganization(input: unknown) {
+  const parsed=orgSchema.safeParse(input);if(!parsed.success)return {ok:false,message:'Enter an organization name.'}
+  const {supabase,user,membership}=await currentMembership();if(!user||!membership)return {ok:false,message:'You must belong to an organization.'}
+  const {error}=await supabase.from('organizations').update({name:parsed.data.name}).eq('id',membership.organization_id)
+  if(error)return {ok:false,message:error.message};revalidatePath('/', 'layout');return {ok:true,message:'Organization saved.'}
+}
+
+export async function updateCustomer(id: string, input: unknown) {
+  const parsed=z.string().uuid().safeParse(id);const body=customerSchema.safeParse(input);if(!parsed.success||!body.success)return {ok:false,message:'Invalid customer details.'}
+  const {supabase,user}=await currentMembership();if(!user)return {ok:false,message:'You must be signed in.'}
+  const {error}=await supabase.from('customers').update({name:body.data.name,email:body.data.email||null,company:body.data.company||null,phone:body.data.phone||null}).eq('id',parsed.data)
+  if(error)return {ok:false,message:error.message};revalidatePath('/customers');revalidatePath(`/customers/${id}`);return {ok:true,message:'Customer updated.'}
+}
+export async function updateInvoiceStatus(id:string,status:'DRAFT'|'SENT'|'PAID'|'OVERDUE'|'CANCELLED'){
+  const parsed=z.string().uuid().safeParse(id);if(!parsed.success)return {ok:false,message:'Invalid invoice.'};const {supabase,user}=await currentMembership();if(!user)return {ok:false,message:'You must be signed in.'};const {error}=await supabase.from('invoices').update({status}).eq('id',parsed.data);if(error)return {ok:false,message:error.message};revalidatePath('/invoices');revalidatePath(`/invoices/${id}`);revalidatePath('/dashboard');return {ok:true,message:'Invoice status updated.'}
+}
+export async function addInvoiceItem(input:unknown){const schema=z.object({invoice_id:z.string().uuid(),description:z.string().trim().min(1).max(500),quantity:z.coerce.number().positive(),unit_price:z.coerce.number().nonnegative()});const parsed=schema.safeParse(input);if(!parsed.success)return {ok:false,message:'Enter a valid line item.'};const {supabase,user}=await currentMembership();if(!user)return {ok:false,message:'You must be signed in.'};const {error}=await supabase.from('invoice_items').insert(parsed.data);if(error)return {ok:false,message:error.message};revalidatePath(`/invoices/${parsed.data.invoice_id}`);return {ok:true,message:'Item added.'}}
+export async function addTaskComment(input:unknown){const schema=z.object({task_id:z.string().uuid(),content:z.string().trim().min(1).max(4000)});const parsed=schema.safeParse(input);const {supabase,user}=await currentMembership();if(!parsed.success||!user)return {ok:false,message:'Enter a comment.'};const {error}=await supabase.from('task_comments').insert({...parsed.data,user_id:user.id});if(error)return {ok:false,message:error.message};revalidatePath('/tasks');return {ok:true,message:'Comment added.'}}
+export async function inviteMember(input:unknown){const schema=z.object({email:z.string().email(),role:z.enum(['ADMIN','MEMBER'])});const parsed=schema.safeParse(input);const {supabase,user,membership}=await currentMembership();if(!parsed.success||!user||!membership)return {ok:false,message:'Enter a valid invitation.'};const {error}=await supabase.from('invitations').insert({organization_id:membership.organization_id,email:parsed.data.email,role:parsed.data.role,invited_by:user.id});if(error)return {ok:false,message:error.message};revalidatePath('/team');return {ok:true,message:'Invitation created. Share it from the Invitations list.'}}
+export async function acceptInvitation(token:string){const parsed=z.string().uuid().safeParse(token);if(!parsed.success)return {ok:false,message:'Invalid invitation.'};const {supabase,user}=await currentMembership();if(!user)return {ok:false,message:'Sign in before accepting an invitation.'};const {error}=await supabase.rpc('accept_invitation',{p_token:parsed.data});if(error)return {ok:false,message:error.message};revalidatePath('/', 'layout');return {ok:true,message:'Invitation accepted.'}}

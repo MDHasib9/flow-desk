@@ -1,2 +1,2 @@
-import { WorkspacePage } from '@/components/workspace-page'
-export default function Page() { return <WorkspacePage kind="activity"/> }
+import { createClient } from '@/lib/server'
+export default async function Page(){const supabase=await createClient();const {data}=await supabase.from('activity_logs').select('id,action,entity_type,created_at').order('created_at',{ascending:false}).limit(100);return <div><h1 className="text-2xl font-semibold">Activity</h1><p className="mt-1 text-sm text-zinc-500">An audit trail for your workspace.</p><section className="mt-7 rounded-xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">{data?.length?data.map(x=><div key={x.id} className="border-l-2 border-indigo-200 py-3 pl-4 text-sm dark:border-indigo-800">{x.action}<p className="mt-1 text-xs text-zinc-500">{x.entity_type} · {new Date(x.created_at).toLocaleString()}</p></div>):<p className="text-center text-sm text-zinc-500">No activity recorded yet.</p>}</section></div>}

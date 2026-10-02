@@ -1,2 +1,3 @@
-import { WorkspacePage } from '@/components/workspace-page'
-export default function Page() { return <WorkspacePage kind="settings"/> }
+import { createClient } from '@/lib/server'
+import { SettingsForms } from '@/components/settings-forms'
+export default async function Page(){const supabase=await createClient();const [{data:{user}},{data:profile},{data:membership}]=await Promise.all([supabase.auth.getUser(),supabase.from('profiles').select('full_name').maybeSingle(),supabase.from('organization_members').select('organizations(name)').limit(1).maybeSingle()]);const org=membership?.organizations;const organization=Array.isArray(org)?org[0]:org;return <SettingsForms name={profile?.full_name || user?.email?.split('@')[0] || ''} organizationName={organization?.name || ''}/>}
