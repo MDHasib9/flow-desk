@@ -22,7 +22,8 @@ const taskCommentSchema = z.object({
  */
 export async function createTask(input: unknown): Promise<ActionResult> {
   const validation = validateInput(taskSchema, input, 'Please enter a valid task.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const task = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -30,11 +31,16 @@ export async function createTask(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase.from('tasks').insert({
-    organization_id: membership.organization_id,
-    project_id: validation.data.project_id,
-    title: validation.data.title,
-    priority: validation.data.priority,
+    organization_id: activeMembership.organization_id,
+    project_id: task.project_id,
+    title: task.title,
+    priority: task.priority,
     status: 'TODO',
   })
   if (error) return { ok: false, message: error.message }
@@ -62,10 +68,15 @@ export async function moveTask(taskId: string, status: unknown): Promise<ActionR
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({ status: statusValidation.data })
-    .eq('organization_id', membership.organization_id)
+    .eq('organization_id', activeMembership.organization_id)
     .eq('id', idValidation.data)
 
   if (error) return { ok: false, message: error.message }
@@ -92,10 +103,15 @@ export async function assignTask(taskId: string, assignedTo: string | null): Pro
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({ assigned_to: assigneeValidation.data })
-    .eq('organization_id', membership.organization_id)
+    .eq('organization_id', activeMembership.organization_id)
     .eq('id', taskIdValidation.data)
 
   if (error) return { ok: false, message: error.message }
@@ -110,7 +126,8 @@ export async function assignTask(taskId: string, assignedTo: string | null): Pro
  */
 export async function addTaskComment(input: unknown): Promise<ActionResult> {
   const validation = validateInput(taskCommentSchema, input, 'Enter a valid comment.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const comment = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -118,11 +135,17 @@ export async function addTaskComment(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const currentUser = user
+  const activeMembership = membership
+  if (!currentUser || !activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase.from('task_comments').insert({
-    task_id: validation.data.task_id,
-    user_id: user.id,
-    content: validation.data.content,
-    organization_id: membership.organization_id,
+    task_id: comment.task_id,
+    user_id: currentUser.id,
+    content: comment.content,
+    organization_id: activeMembership.organization_id,
   })
 
   if (error) return { ok: false, message: error.message }

@@ -27,7 +27,8 @@ const invoiceItemSchema = z.object({
  */
 export async function createInvoice(input: unknown): Promise<ActionResult> {
   const validation = validateInput(invoiceSchema, input, 'Enter a customer and valid amounts.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const invoice = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -35,16 +36,21 @@ export async function createInvoice(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
   const { error } = await supabase.from('invoices').insert({
-    organization_id: membership.organization_id,
-    customer_id: validation.data.customer_id,
+    organization_id: activeMembership.organization_id,
+    customer_id: invoice.customer_id,
     invoice_number: invoiceNumber,
-    subtotal: validation.data.subtotal,
-    tax: validation.data.tax,
-    total: validation.data.total,
-    due_date: validation.data.due_date || null,
-    description: validation.data.description || null,
+    subtotal: invoice.subtotal,
+    tax: invoice.tax,
+    total: invoice.total,
+    due_date: invoice.due_date || null,
+    description: invoice.description || null,
     status: 'DRAFT',
   })
 
@@ -72,11 +78,16 @@ export async function updateInvoiceStatus(id: string, status: unknown): Promise<
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase
     .from('invoices')
     .update({ status: statusValidation.data })
     .eq('id', idValidation.data)
-    .eq('organization_id', membership.organization_id)
+    .eq('organization_id', activeMembership.organization_id)
 
   if (error) return { ok: false, message: error.message }
 
@@ -90,7 +101,8 @@ export async function updateInvoiceStatus(id: string, status: unknown): Promise<
  */
 export async function addInvoiceItem(input: unknown): Promise<ActionResult> {
   const validation = validateInput(invoiceItemSchema, input, 'Enter a valid line item.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const lineItem = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -98,12 +110,17 @@ export async function addInvoiceItem(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase.from('invoice_items').insert({
-    invoice_id: validation.data.invoice_id,
-    description: validation.data.description,
-    quantity: validation.data.quantity,
-    unit_price: validation.data.unit_price,
-    organization_id: membership.organization_id,
+    invoice_id: lineItem.invoice_id,
+    description: lineItem.description,
+    quantity: lineItem.quantity,
+    unit_price: lineItem.unit_price,
+    organization_id: activeMembership.organization_id,
   })
 
   if (error) return { ok: false, message: error.message }

@@ -5,7 +5,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient, throwIfSupabaseError } from '@/lib/server'
-import { activeWorkspaceCookie, getWorkspaceContext } from '@/lib/workspace'
+import { activeWorkspaceCookie } from '@/lib/workspace'
 import { ActionResult, currentMembership, requireAuth, requireMembership, validateInput } from '@/lib/action-helpers'
 
 const organizationSchema = z.object({
@@ -62,18 +62,18 @@ export async function switchWorkspace(organizationId: unknown): Promise<ActionRe
  */
 export async function createOrganization(input: unknown): Promise<ActionResult> {
   const validation = validateInput(organizationSchema, input, 'Invalid workspace details.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const data = validation.data!
 
   const { user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
   if (!authCheck.ok) return authCheck
-
   if (membership) {
     return { ok: false, message: 'Your account already belongs to a workspace.' }
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('organizations').insert(validation.data)
+  const { error } = await supabase.from('organizations').insert(data)
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/', 'layout')
@@ -85,13 +85,19 @@ export async function createOrganization(input: unknown): Promise<ActionResult> 
  */
 export async function updateProfile(input: unknown): Promise<ActionResult> {
   const validation = validateInput(profileSchema, input, 'Enter your name.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const profile = validation.data!
 
   const { supabase, user } = await currentMembership()
   const authCheck = requireAuth(user)
   if (!authCheck.ok) return authCheck
 
-  const { error } = await supabase.from('profiles').update({ full_name: validation.data.full_name }).eq('id', user.id)
+  const currentUser = user
+  if (!currentUser) {
+    return { ok: false, message: 'You must be signed in.' }
+  }
+
+  const { error } = await supabase.from('profiles').update({ full_name: profile.full_name }).eq('id', currentUser.id)
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/', 'layout')
@@ -103,7 +109,8 @@ export async function updateProfile(input: unknown): Promise<ActionResult> {
  */
 export async function updateOrganization(input: unknown): Promise<ActionResult> {
   const validation = validateInput(orgSchema, input, 'Enter an organization name.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const org = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -111,10 +118,15 @@ export async function updateOrganization(input: unknown): Promise<ActionResult> 
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase
     .from('organizations')
-    .update({ name: validation.data.name })
-    .eq('id', membership.organization_id)
+    .update({ name: org.name })
+    .eq('id', activeMembership.organization_id)
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/', 'layout')

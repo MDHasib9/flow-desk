@@ -16,7 +16,8 @@ const customerSchema = z.object({
  */
 export async function createCustomer(input: unknown): Promise<ActionResult> {
   const validation = validateInput(customerSchema, input, 'Please provide a valid customer name and email.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const customer = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -24,12 +25,17 @@ export async function createCustomer(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase.from('customers').insert({
-    organization_id: membership.organization_id,
-    name: validation.data.name,
-    email: validation.data.email || null,
-    company: validation.data.company || null,
-    phone: validation.data.phone || null,
+    organization_id: activeMembership.organization_id,
+    name: customer.name,
+    email: customer.email || null,
+    company: customer.company || null,
+    phone: customer.phone || null,
   })
   if (error) return { ok: false, message: error.message }
 
@@ -43,10 +49,11 @@ export async function createCustomer(input: unknown): Promise<ActionResult> {
 export async function updateCustomer(id: string, input: unknown): Promise<ActionResult> {
   const idValidation = z.string().uuid().safeParse(id)
   const bodyValidation = validateInput(customerSchema, input, 'Invalid customer details.')
-  
-  if (!idValidation.success || !bodyValidation.success) {
+
+  if (!idValidation.success || !bodyValidation.ok) {
     return { ok: false, message: 'Invalid customer details.' }
   }
+  const customer = bodyValidation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -54,17 +61,22 @@ export async function updateCustomer(id: string, input: unknown): Promise<Action
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase
     .from('customers')
     .update({
-      name: bodyValidation.data.name,
-      email: bodyValidation.data.email || null,
-      company: bodyValidation.data.company || null,
-      phone: bodyValidation.data.phone || null,
+      name: customer.name,
+      email: customer.email || null,
+      company: customer.company || null,
+      phone: customer.phone || null,
     })
     .eq('id', idValidation.data)
-    .eq('organization_id', membership.organization_id)
-  
+    .eq('organization_id', activeMembership.organization_id)
+
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/customers')

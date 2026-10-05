@@ -40,15 +40,16 @@ export async function currentMembership() {
  * Returns validation error message if parsing fails
  */
 export function validateInput<T>(
-  schema: z.ZodSchema,
+  schema: z.ZodType<T>,
   input: unknown,
   errorMessage: string,
-): { success: false; message: string } | { success: true; data: T } {
+): ActionResult<T> {
   const parsed = schema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? errorMessage }
+    return { ok: false, message: parsed.error.issues[0]?.message ?? errorMessage }
   }
-  return { success: true, data: parsed.data as T }
+
+  return { ok: true, message: '', data: parsed.data }
 }
 
 /**

@@ -17,7 +17,8 @@ const saveProjectFileSchema = z.object({
  */
 export async function saveProjectFile(input: unknown): Promise<ActionResult> {
   const validation = validateInput(saveProjectFileSchema, input, 'Invalid file details.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const file = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -25,14 +26,20 @@ export async function saveProjectFile(input: unknown): Promise<ActionResult> {
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const currentUser = user
+  const activeMembership = membership
+  if (!currentUser || !activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { error } = await supabase.from('project_files').insert({
-    organization_id: membership.organization_id,
-    project_id: validation.data.project_id,
-    file_name: validation.data.file_name,
-    file_path: validation.data.file_path,
-    file_type: validation.data.file_type,
-    file_size: validation.data.file_size,
-    uploaded_by: user.id,
+    organization_id: activeMembership.organization_id,
+    project_id: file.project_id,
+    file_name: file.file_name,
+    file_path: file.file_path,
+    file_type: file.file_type,
+    file_size: file.file_size,
+    uploaded_by: currentUser.id,
   })
 
   if (error) return { ok: false, message: error.message }
@@ -46,7 +53,8 @@ export async function saveProjectFile(input: unknown): Promise<ActionResult> {
  */
 export async function getProjectFileDownloadUrl(id: string): Promise<ActionResult<{ url: string }>> {
   const validation = validateInput(z.string().uuid(), id, 'Invalid file.')
-  if (!validation.success) return validation
+  if (!validation.ok) return validation
+  const fileId = validation.data!
 
   const { supabase, user, membership } = await currentMembership()
   const authCheck = requireAuth(user)
@@ -54,11 +62,16 @@ export async function getProjectFileDownloadUrl(id: string): Promise<ActionResul
   const membershipCheck = requireMembership(membership)
   if (!membershipCheck.ok) return membershipCheck
 
+  const activeMembership = membership
+  if (!activeMembership) {
+    return { ok: false, message: 'You must belong to an organization.' }
+  }
+
   const { data: file, error } = await supabase
     .from('project_files')
     .select('file_path,file_name')
-    .eq('id', validation.data)
-    .eq('organization_id', membership.organization_id)
+    .eq('id', fileId)
+    .eq('organization_id', activeMembership.organization_id)
     .maybeSingle()
 
   if (error) return { ok: false, message: error.message }
